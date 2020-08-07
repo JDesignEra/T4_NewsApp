@@ -16,20 +16,23 @@ class BadgeViewController: UIViewController,UITableViewDelegate, UITableViewData
     let db = Firestore.firestore()
     
     @IBOutlet weak var tableView: UITableView!
+    
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         
         // Start additional setup after loading the view.
         
-        //Load badge categories from firestore
-        db.collection("badgeCategory").getDocuments() { (querySnapshot, err) in
+        //Load badge categories from firestore order by category index field
+        db.collection("badgeCategory").order(by: "categoryIndex").getDocuments() { (querySnapshot, err) in
             if let err = err {
                 print("Error getting documents: \(err)")
             } else {
                 for document in querySnapshot!.documents {
+                    let badgeID = document.documentID
                     let badgeTitle = document.data()["categoryTitle"]! as! String
                     let badgeImage = document.data()["categoryImage"]! as! String
-                    self.BadgeCategories.append(Badge(Name: badgeTitle, Image: badgeImage, ProgressionCurrent:10 , ProgressionMax: 15))
+                    self.BadgeCategories.append(Badge(ID: badgeID,Name: badgeTitle, Image: badgeImage, ProgressionCurrent:10 , ProgressionMax: 15))
                     
                     // for debugging
                     print (self.BadgeCategories.count)
@@ -85,6 +88,24 @@ class BadgeViewController: UIViewController,UITableViewDelegate, UITableViewData
         
     }
     
+    
+    
+    override func prepare(for segue: UIStoryboardSegue,sender: Any?){
+        if(segue.identifier == "showBadgeType")
+        {
+            let detailViewController = segue.destination as! BadgeCategoryViewController
+            let myIndexPath = self.tableView.indexPathForSelectedRow
+            
+            if(myIndexPath != nil){
+                // Set the movieItem field with the movi
+                // object selected by the user.
+                let badgeTypeCategory = BadgeCategories[myIndexPath!.row].badgeCategoryName
+                let badgeCategoryID = BadgeCategories[myIndexPath!.row].badgeCategoryID
+                detailViewController.BadgeCategory = badgeTypeCategory
+                detailViewController.BadgeCategoryID = badgeCategoryID
+            }
+        }
+    }
     
 
     /*

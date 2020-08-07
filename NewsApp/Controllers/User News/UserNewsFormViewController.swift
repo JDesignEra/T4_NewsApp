@@ -2,34 +2,33 @@
 //  UserNewsFormViewController.swift
 //  NewsApp
 //
-//  Created by katgoh on 22/7/20.
+//  Created by Sharon on 22/7/20.
 //  Copyright © 2020 M02-4. All rights reserved.
 //
 
 import UIKit
 
-class UserNewsFormViewController: UIViewController {
+class UserNewsFormViewController: UIViewController, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
 
     @IBOutlet weak var imageView: UIImageView!
-    
     @IBOutlet weak var imageSelectButton: UIButton!
-    
     @IBOutlet weak var imageLabel: UILabel!
-    
     @IBOutlet weak var titleTextField: UITextField!
-    
     @IBOutlet weak var contentTextView: UITextView!
-    
     @IBOutlet weak var submitButton: UIButton!
     
+    var imgPicker = UIImagePickerController()
     
     override func viewDidLoad() {
         super.viewDidLoad()
-
-        // Do any additional setup after loading the view.
     }
     
-
+    func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+        imageView.image = info[.originalImage] as? UIImage
+        
+        // TODO: Store image into firebase storage
+    }
+    
     @IBAction func submitButtonPressed(_ sender: UIButton) {
         let imageName = (imageLabel.text ?? "imgName")!
         let title = (titleTextField.text ?? "title")!
@@ -45,17 +44,17 @@ class UserNewsFormViewController: UIViewController {
         let article: UserNewsArticle = UserNewsArticle("test", title, content, formattedDate, imageName, lastUpdated: formattedDate);
         
         //add article to collection userNews in FireStore
-        UserNewsDataManager.addUserNews(article)
-        
+        UserNewsDataManager.addUserNews(article, UserNewsDataManager.getNoOfNews())
     }
-    /*
-    // MARK: - Navigation
-
-    // In a storyboard-based application, you will often want to do a little preparation before navigation
-    override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
-        // Get the new view controller using segue.destination.
-        // Pass the selected object to the new view controller.
+    
+    @IBAction func selectImgBtn_touch_inside(_ sender: Any) {
+        if UIImagePickerController.isSourceTypeAvailable(.photoLibrary) {
+            print(true)
+            imgPicker.delegate = self
+            imgPicker.sourceType = .photoLibrary
+            imgPicker.allowsEditing = false
+            
+            present(imgPicker, animated: true, completion: nil)
+        }
     }
-    */
-
 }

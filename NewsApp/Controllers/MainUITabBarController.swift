@@ -9,13 +9,26 @@
 import UIKit
 import SwiftyGif
 
-class MainUITabBarController: UITabBarController {
-    let logoAnimationUIView = LogoAnimationUIView()
-        
+class MainUITabBarController: UITabBarController, UITabBarControllerDelegate {
+    private let logoAnimationUIView = LogoAnimationUIView()
+    private var tabItems: [UITabBarItem]?
+    private var vcs: [UIViewController]?
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         
-        view.addSubview(logoAnimationUIView)
+        UserDefaults.standard.set(false, forKey: "_UIConstraintBasedLayoutLogUnsatisfiable")
+        
+        self.tabItems = self.tabBar.items
+        self.vcs = [
+            self.storyboard!.instantiateViewController(withIdentifier: "BookmarksNavigation"),
+            self.storyboard!.instantiateViewController(withIdentifier: "BadgesNavigation")
+        ]
+        
+        vcs?[0].tabBarItem = tabItems?[3]
+        vcs?[1].tabBarItem = tabItems?[4]
+        
+        self.view.addSubview(logoAnimationUIView)
         logoAnimationUIView.pinEdgesToSuperView()
         logoAnimationUIView.logoGifImageView.delegate = self
     }
@@ -24,6 +37,26 @@ class MainUITabBarController: UITabBarController {
         super.viewDidAppear(animated)
         
         logoAnimationUIView.logoGifImageView.startAnimatingGif()
+        
+        UserDataManager.shared.delegate = self
+        updateTabItems()
+    }
+    
+    func updateTabItems() {
+        if tabItems != nil && vcs != nil {
+            if UserDataManager.loggedIn == nil && self.viewControllers?.count ?? 0 > 4 {
+                self.viewControllers?.removeLast(2)
+            }
+            else if self.viewControllers?.count ?? 0 < 5 {
+                self.viewControllers?.append(contentsOf: vcs!)
+            }
+        }
+    }
+}
+
+extension MainUITabBarController: UserManagerDelegate {
+    func loggedInDidChange(newVal: User?) {
+        updateTabItems()
     }
 }
 

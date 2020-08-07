@@ -34,8 +34,18 @@ class UserNewsDataManager {
         }
     }
     
-    static func addUserNews(_ article: UserNewsArticle){
-        db.collection("userNews").document().setData(
+    static func getNoOfNews() -> Int{
+        var newsList2: [UserNewsArticle] = []
+        self.loadUserNews(){
+            newsListFromFireStore in
+            newsList2 = newsListFromFireStore
+        }
+        return newsList2.count
+    }
+    
+    static func addUserNews(_ article: UserNewsArticle, _ postId: Int){
+       
+        db.collection("userNews").document("UN"+String(postId)).setData(
             [
                 "username": article.username,
                 "title": article.title,
@@ -52,6 +62,18 @@ class UserNewsDataManager {
                 print("Document successfully written!")
             }
         }
+    }
+    
+    static func updateUserNews (_ article: UserNewsArticle){
+        db.collection("userNews").document("placeholder").updateData(
+            [
+                "username": article.username,
+                "title": article.title,
+                "content": article.content,
+                "imageName": article.imageName,
+                "lastUpdated": article.lastUpdated
+            ]
+        )
     }
     
     static func deleteUserNews(_ newsId: String){

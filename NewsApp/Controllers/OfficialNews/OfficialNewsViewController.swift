@@ -9,13 +9,12 @@
 import UIKit
 
 class OfficialNewsViewController: UIViewController, UITableViewDelegate, UITableViewDataSource, UISearchBarDelegate {
-    @IBOutlet weak var tableView: UITableView!
+    @IBOutlet var tableView: UITableView!
     
     var tableList: [String: [OfficialNewsArticle]] = [
         "The Straits Times": [],
         "CNA": []
     ]
-    
     var newsList: [String: [OfficialNewsArticle]] = [
         "The Straits Times": [],
         "CNA": []
@@ -23,6 +22,10 @@ class OfficialNewsViewController: UIViewController, UITableViewDelegate, UITable
     
     override func viewDidLoad() {
         super.viewDidLoad()
+    }
+    
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
         loadNews()
     }
     
@@ -32,8 +35,7 @@ class OfficialNewsViewController: UIViewController, UITableViewDelegate, UITable
             let indexPath = self.tableView.indexPathForSelectedRow
             
             if (indexPath != nil) {
-                let article = tableList[Array(tableList.keys)[indexPath!.section]]?[indexPath!.row]
-                detailVC.article = article
+                detailVC.article = tableList[Array(tableList.keys)[indexPath!.section]]?[indexPath!.row]
             }
         }
     }
@@ -43,9 +45,8 @@ class OfficialNewsViewController: UIViewController, UITableViewDelegate, UITable
     }
     
     func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
-        if searchText == "" {
+        if searchText.isEmpty {
             tableList = newsList
-            
             self.tableView.reloadData()
         }
     }
@@ -59,7 +60,7 @@ class OfficialNewsViewController: UIViewController, UITableViewDelegate, UITable
             return tableList[Array(tableList.keys)[section]]!.count
         }
         
-        return 1
+        return 0
     }
     
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
@@ -95,9 +96,9 @@ class OfficialNewsViewController: UIViewController, UITableViewDelegate, UITable
     }
     
     func loadNews() {
-        self.loadingAlertPresent(loadingText: "Loading List...")
+        self.presentSpinnerAlert(message: "Loading List...")
         
-        OfficialNewsDataManager().loadNews(onComplete: {
+        OfficialNewsDataManager.loadNews(onComplete: {
             results in
             
             for item in results {
@@ -119,24 +120,23 @@ class OfficialNewsViewController: UIViewController, UITableViewDelegate, UITable
     }
     
     func searchNews(searchText: String) {
+        self.presentSpinnerAlert(message: "Searching...")
+        
         let taskGroup = DispatchGroup()
-        let officialNewsDM = OfficialNewsDataManager()
         
-        loadingAlertPresent(loadingText: "Searching...")
-        
-        if searchText != "" {
+        if !searchText.isEmpty {
             for item in self.tableList {
                 self.tableList[item.key] = []
             }
             
             taskGroup.enter()
-            officialNewsDM.newsSearchApi(params: "qInTitle=\(searchText)&domains=straitstimes.com&pageSize=100", onComplete: {
+            OfficialNewsDataManager.newsSearchApi(params: "qInTitle=\(searchText)&domains=straitstimes.com&pageSize=100", onComplete: {
                 results in self.tableList["The Straits Times"]?.append(contentsOf: results)
                 taskGroup.leave()
             })
             
             taskGroup.enter()
-            officialNewsDM.newsSearchApi(params: "qInTitle=\(searchText)&domains=channelnewsasia.com&pageSize=100", onComplete: {
+            OfficialNewsDataManager.newsSearchApi(params: "qInTitle=\(searchText)&domains=channelnewsasia.com&pageSize=100", onComplete: {
                 results in self.tableList["CNA"]?.append(contentsOf: results)
                 taskGroup.leave()
             })
@@ -150,16 +150,5 @@ class OfficialNewsViewController: UIViewController, UITableViewDelegate, UITable
             self.tableView.reloadData()
             self.dismiss(animated: false, completion: nil)
         })
-    }
-    
-    func loadingAlertPresent(loadingText: String) {
-        let loadAlert = UIAlertController(title: nil, message: loadingText, preferredStyle: .alert)
-        let loadingIndicator = UIActivityIndicatorView(frame: CGRect(x: 10, y: 5, width: 50, height: 50))
-        loadingIndicator.hidesWhenStopped = true
-        loadingIndicator.style = .medium
-        loadingIndicator.startAnimating();
-
-        loadAlert.view.addSubview(loadingIndicator)
-        self.present(loadAlert, animated: false, completion: nil)
     }
 }

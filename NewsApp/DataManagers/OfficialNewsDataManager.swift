@@ -11,73 +11,78 @@ import FirebaseFirestore
 import FirebaseFirestoreSwift
 
 class OfficialNewsDataManager: NSObject {
-    let db = Firestore.firestore()
+    static let db = Firestore.firestore()
+    private static let newsRef = db.collection("officialNews")
+    private static var newsArticles: [OfficialNewsArticle] = []
     
     // Store or retrive from DB with 60 mins interval check to prevent hitting API call limit
-    func loadNews(onComplete: (([OfficialNewsArticle]) -> Void)?) {
+    static func loadNews(onComplete: (([OfficialNewsArticle]) -> Void)?) {
         let taskGroup = DispatchGroup()
-        let dbLastModifiedDM = DBLastModifiedDataManager()
         
         var updateFlag = false
-        var dbLastModified: [DBLastModified] = []
+        var lastModified: Date?
         var delArticles: [OfficialNewsArticle] = []
-        var newsArticles: [OfficialNewsArticle] = []
         
         taskGroup.enter()
-        dbLastModifiedDM.getLastModified(onComplete: {
-            results in dbLastModified.append(contentsOf: results)
+        DBLastModifiedDataManager.getLastModified(tableName: "officialNews", onComplete: {
+            results in lastModified = results?.lastModified
             
-            taskGroup.enter()
-            self.getOfficialNews(onComplete: {
-                results in newsArticles.append(contentsOf: results)
+            if lastModified != nil {
+                let lastModifiedMins = Calendar.current.dateComponents([.minute], from: lastModified!, to: Date()).minute ?? 0
                 
-                if let idx: Int = dbLastModified.firstIndex(where: { $0.table == "officialNews" }) {
-                    let lastModified: Int = Calendar.current.dateComponents([.minute], from: dbLastModified[idx].lastModified, to: Date()).minute ?? 0
+                updateFlag = lastModifiedMins > 60 ? true: false
+            }
+            else {
+                updateFlag = true
+            }
+            
+            // check before newsArticles assignment
+            if updateFlag || self.newsArticles.count < 1 {
+                taskGroup.enter()
+                self.getOfficialNews(onComplete: {
+                    results in
                     
-                    updateFlag = lastModified > 60 || newsArticles.count < 1 ? true : false
-                }
-                else {
-                    updateFlag = true
-                }
-                
-                if updateFlag {
-                    delArticles = newsArticles
-                    newsArticles = []
+                    self.newsArticles = results
+                    delArticles = results
                     
-                    taskGroup.enter()
-                    self.newsSearchApi(params: "q= &domains=straitstimes.com&pageSize=100", onComplete: {
-                        results in newsArticles.append(contentsOf: results)
-                        taskGroup.leave()
-                    })
+                    // check after newsArticles assignment
+                    if updateFlag || self.newsArticles.count < 1 {
+                        updateFlag = true
+                        self.newsArticles = []
+                        
+                        taskGroup.enter()
+                        self.newsSearchApi(params: "q= &domains=straitstimes.com&pageSize=50", onComplete: {
+                            results in self.newsArticles.append(contentsOf: results)
+                            taskGroup.leave()
+                        })
+                        
+                        taskGroup.enter()
+                        self.newsSearchApi(params: "q= &domains=channelnewsasia.com&pageSize=50", onComplete: {
+                            results in newsArticles.append(contentsOf: results)
+                            taskGroup.leave()
+                        })
+                    }
                     
-                    taskGroup.enter()
-                    self.newsSearchApi(params: "q= &domains=channelnewsasia.com&pageSize=100", onComplete: {
-                        results in newsArticles.append(contentsOf: results)
-                        taskGroup.leave()
-                    })
-                }
-                
-                taskGroup.leave()
-            })
+                    taskGroup.leave()
+                })
+            }
             
             taskGroup.leave()
         })
         
         taskGroup.notify(queue: .main, execute: {
-            newsArticles.sort(by: { $0.publishDate > $1.publishDate })
-            
             if updateFlag {
                 self.deleteMultiOfficialNews(delArticles)
                 self.insertMultiOfficialNews(newsArticles)
                 
-                dbLastModifiedDM.insertReplaceLastModified(DBLastModified(table: "officialNews", lastModified: Date()))
+                DBLastModifiedDataManager.insertReplaceLastModified(DBLastModified(table: "officialNews", lastModified: Date()))
             }
             
             onComplete?(newsArticles)
         })
     }
     
-    func newsSearchApi(params: String?, onComplete: (([OfficialNewsArticle]) -> Void)?) {
+    static func newsSearchApi(params: String?, onComplete: (([OfficialNewsArticle]) -> Void)?) {
         let url = "https://newsapi.org/v2/everything?\(params ?? "")&apiKey=3837e3a4044b4f33ae22d5d0ecb07a22".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!
         
         HTTP.getJSON(url: url, onComplete: {
@@ -98,7 +103,6 @@ class OfficialNewsDataManager: NSObject {
                 
                 newsArticles.append(
                     OfficialNewsArticle(
-                        id: nil,
                         source: a["source"]["name"].string ?? "",
                         title: a["title"].string ?? "",
                         desc: a["description"].string ?? "",
@@ -113,8 +117,8 @@ class OfficialNewsDataManager: NSObject {
         })
     }
     
-    private func getOfficialNews(onComplete: (([OfficialNewsArticle]) -> Void)?) {
-        db.collection("officialNews").getDocuments() {
+    private static func getOfficialNews(onComplete: (([OfficialNewsArticle]) -> Void)?) {
+        newsRef.order(by: "publishDate").getDocuments() {
             (snapshot, err) in
             
             var articleList: [OfficialNewsArticle] = []
@@ -130,60 +134,42 @@ class OfficialNewsDataManager: NSObject {
                         articleList.append(item!)
                     }
                 }
-                
-                articleList.sort(by: { $0.publishDate > $1.publishDate })
             }
             
             onComplete?(articleList)
         }
     }
     
-    private func insertMultiOfficialNews(_ articleList: [OfficialNewsArticle]) {
-        for item in articleList {
-            var ref: DocumentReference? = nil
-            
-            ref = try? db.collection("officialNews").addDocument(from: item, encoder: Firestore.Encoder()) {
+    private static func insertMultiOfficialNews(_ articleList: [OfficialNewsArticle]) {
+        for (i, item) in articleList.enumerated() {
+            _ = try? self.newsRef.addDocument(from: item, encoder: Firestore.Encoder()) {
                 err in
                 
                 if let err = err {
                     print("OfficialNewsDataManager: \(err)")
                 }
-                else if !(ref?.documentID.isEmpty ?? false) {
-                    let article = OfficialNewsArticle(id: ref?.documentID, source: item.source, title: item.title, desc: item.desc, url: item.url, urlImg: item.urlImg, publishDate: item.publishDate)
+                
+                if (i >= articleList.count - 1) {
+                    print("OfficialNewsDataManager: Add successful!")
+                }
+            }
+        }
+    }
+    
+    private static func deleteMultiOfficialNews(_ articleList: [OfficialNewsArticle]) {
+        for (i, item) in articleList.enumerated() {
+            if (item.id != nil) {
+                self.newsRef.document(item.id!).delete() {
+                    err in
                     
-                    self.updateOfficialNews(article)
-                }
-                else {
-                    ref?.delete()
-                    print("OfficialNewsDataManager: Add unsuccessful!")
-                }
-            }
-        }
-    }
-    
-    private func updateOfficialNews(_ article: OfficialNewsArticle) {
-        if article.id != nil && article.id != "" {
-            try? db.collection("officialNews").document(article.id ?? "").setData(from: article, encoder: Firestore.Encoder()) {
-                err in
-                
-                if let err = err {
-                    print("OfficialNewsDataManager: \(err)")
-                }
-                else {
-                    print("OfficialNewsDataManager: Updated successfully!")
+                    if let err = err {
+                        print("OfficialNewsDataManager: \(err)")
+                    }
+                    else if (i >= articleList.count - 1) {
+                        print("OfficialNewsDataManager: Delete successful!")
+                    }
                 }
             }
         }
-        else {
-            print("OfficialNewsDataManager: Document ID does not exist!")
-        }
-    }
-    
-    private func deleteMultiOfficialNews(_ articleList: [OfficialNewsArticle]) {
-        for item in articleList {
-            db.collection("officialNews").document(item.id!).delete()
-        }
-        
-        print("OfficialNewsDataManager: Delete successful!")
     }
 }
