@@ -11,14 +11,8 @@ import UIKit
 class OfficialNewsViewController: UIViewController, UITableViewDelegate, UITableViewDataSource, UISearchBarDelegate {
     @IBOutlet var tableView: UITableView!
     
-    var tableList: [String: [OfficialNewsArticle]] = [
-        "The Straits Times": [],
-        "CNA": []
-    ]
-    var newsList: [String: [OfficialNewsArticle]] = [
-        "The Straits Times": [],
-        "CNA": []
-    ]
+    var tableList: [String: [OfficialNewsArticle]] = [:]
+    var newsList: [String: [OfficialNewsArticle]] = [:]
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -103,10 +97,22 @@ class OfficialNewsViewController: UIViewController, UITableViewDelegate, UITable
             
             for item in results {
                 if item.source.lowercased() == "cna" {
+                    let key = item.source.uppercased()
+                    
+                    if (self.newsList[key] == nil) {
+                        self.newsList[key] = []
+                    }
+                    
                     self.newsList["CNA"]?.append(item)
                 }
                 else if item.source.lowercased() == "the straits times" {
-                    self.newsList["The Straits Times"]?.append(item)
+                    let key = item.source.capitalized
+                    
+                    if (self.newsList[key] == nil) {
+                        self.newsList[key] = []
+                    }
+                    
+                    self.newsList[key]?.append(item)
                 }
             }
             
@@ -130,13 +136,13 @@ class OfficialNewsViewController: UIViewController, UITableViewDelegate, UITable
             }
             
             taskGroup.enter()
-            OfficialNewsDataManager.newsSearchApi(params: "qInTitle=\(searchText)&domains=straitstimes.com&pageSize=100", onComplete: {
+            OfficialNewsDataManager.newsSearchApi(params: "qInTitle=\(searchText)&domains=straitstimes.com&pageSize=50", onComplete: {
                 results in self.tableList["The Straits Times"]?.append(contentsOf: results)
                 taskGroup.leave()
             })
             
             taskGroup.enter()
-            OfficialNewsDataManager.newsSearchApi(params: "qInTitle=\(searchText)&domains=channelnewsasia.com&pageSize=100", onComplete: {
+            OfficialNewsDataManager.newsSearchApi(params: "qInTitle=\(searchText)&domains=channelnewsasia.com&pageSize=50", onComplete: {
                 results in self.tableList["CNA"]?.append(contentsOf: results)
                 taskGroup.leave()
             })

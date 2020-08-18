@@ -10,9 +10,24 @@ import UIKit
 
 class UserNewsViewController: UIViewController, UITableViewDelegate, UITableViewDataSource, UISearchBarDelegate {
     
-    var newsList: [UserNewsArticle] = []
-    
     @IBOutlet weak var newsTableView: UITableView!
+    var newsList: [UserNewsArticle] = []
+
+    override func prepare(for segue : UIStoryboardSegue, sender: Any?){
+        if segue.identifier == "ShowUserNewsDetails"
+        {
+            let destViewController = segue.destination as! UserNewsDetailViewController
+            let myIndexPath = self.newsTableView.indexPathForSelectedRow
+            if myIndexPath != nil
+            {
+                let userNews = newsList[myIndexPath!.row]
+                destViewController.usernewsItem = userNews
+            }
+        }
+    }
+    
+    
+    
     func loadNews(){
         UserNewsDataManager.loadUserNews(){
             newsListFromFireStore in
@@ -39,7 +54,7 @@ class UserNewsViewController: UIViewController, UITableViewDelegate, UITableView
         cell.UNameLabel?.text = "\(p.title)"
         cell.UDateLabel?.text = "\(p.date)"
         cell.UsernameLabel?.text = "test"
-        cell.UNewsImage?.image = nil
+        cell.UNewsImage?.image = UIImage(named: p.imageName)
         
         return cell
     }
@@ -47,7 +62,11 @@ class UserNewsViewController: UIViewController, UITableViewDelegate, UITableView
     func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCell.EditingStyle, forRowAt indexPath: IndexPath){
         if editingStyle == .delete
         {
+            let usernews = newsList[indexPath.row]
             newsList.remove(at: indexPath.row)
+            
+            UserNewsDataManager.deleteUserNews(usernews)
+            
             tableView.deleteRows(at: [indexPath], with: .automatic)
         }
     }

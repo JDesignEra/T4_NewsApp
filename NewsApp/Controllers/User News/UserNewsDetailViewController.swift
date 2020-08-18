@@ -23,6 +23,11 @@ class UserNewsDetailViewController: UIViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
+        
+        titleLabel.text = usernewsItem?.title
+        dateLabel.text = usernewsItem?.date
+        contentLabel.text = usernewsItem?.content
+        usernewsImage.image = UIImage(named: "logo")
     }
     
     override func viewDidAppear(_ animated: Bool) {
@@ -72,7 +77,7 @@ class UserNewsDetailViewController: UIViewController {
     
     func getBookmark() {
         if UserDataManager.loggedIn != nil && usernewsItem != nil {
-            BookmarkDataManager.getBookmark(user: UserDataManager.loggedIn!, article: usernewsItem!, onComplete: {
+            BookmarkDataManager.getUserNewsBookmark(user: UserDataManager.loggedIn!, article: usernewsItem!, onComplete: {
                 result in
                 
                 self.bookmark = result
